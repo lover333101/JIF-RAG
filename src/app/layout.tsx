@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import ClientSecurityGuards from "@/components/ClientSecurityGuards";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -23,7 +24,10 @@ export default function RootLayout({
           crossOrigin="anonymous"
         />
       </head>
-      <body>{children}</body>
+      <body>
+        <ClientSecurityGuards />
+        {children}
+      </body>
     </html>
   );
 }
