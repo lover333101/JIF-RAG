@@ -639,20 +639,33 @@ function TypingIndicator({
 }
 
 function buildMarkdownForCopy(message: ChatMessage): string {
-    const base = (message.markdownContent ?? message.content ?? "").trim();
+    const base = (message.content ?? message.markdownContent ?? "").trim();
     if (!base) return "";
 
-    if (!message.citations || message.citations.length === 0) {
-        return base;
+    let out = base
+        // Remove appended citation section entirely.
+        .replace(/\n{0,2}###\s+Citations[\s\S]*$/i, "")
+        // Remove common inline source token formats.
+        .replace(/\[\s*source\s*=\s*[^\]\n]+\]/gi, "")
+        .replace(/\[\s*source\s*#?\s*\d+[^\]\n]*\]/gi, "");
+
+    if (message.citations && message.citations.length > 0) {
+        for (const citation of message.citations) {
+            const trimmed = citation.trim();
+            if (!trimmed) continue;
+            const sourcePattern = new RegExp(
+                `\\[\\s*${escapeRegExp(trimmed)}\\s*\\]`,
+                "gi"
+            );
+            out = out.replace(sourcePattern, "");
+        }
     }
 
-    if (base.includes("### Citations")) {
-        return base;
-    }
-
-    return `${base}\n\n### Citations\n${message.citations
-        .map((source) => `- [${source}]`)
-        .join("\n")}`;
+    return out
+        .replace(/[ \t]+\n/g, "\n")
+        .replace(/[ \t]{2,}/g, " ")
+        .replace(/\n{3,}/g, "\n\n")
+        .trim();
 }
 
 async function writeClipboard(text: string): Promise<void> {

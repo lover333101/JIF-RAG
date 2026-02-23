@@ -51,6 +51,37 @@ export function extractUpstreamErrorMessage(
 ): string {
     if (payload && typeof payload === "object") {
         const record = payload as Record<string, unknown>;
+
+        // Handle FastAPI 422 validation error arrays
+        if (Array.isArray(record.detail)) {
+            try {
+                const msgs = record.detail.map((err) => {
+                    if (!err || typeof err !== "object") {
+                        return "Invalid payload field.";
+                    }
+                    const row = err as Record<string, unknown>;
+                    const loc = Array.isArray(row.loc)
+                        ? row.loc
+                            .map((part) =>
+                                typeof part === "string" || typeof part === "number"
+                                    ? String(part)
+                                    : ""
+                            )
+                            .filter(Boolean)
+                            .join(".")
+                        : "";
+                    const msg =
+                        typeof row.msg === "string" && row.msg.trim()
+                            ? row.msg.trim()
+                            : "Invalid value.";
+                    return `${loc ? `${loc}: ` : ""}${msg}`;
+                });
+                return msgs.join(", ");
+            } catch {
+                return JSON.stringify(record.detail);
+            }
+        }
+
         if (typeof record.detail === "string" && record.detail.trim()) {
             return record.detail.trim();
         }
