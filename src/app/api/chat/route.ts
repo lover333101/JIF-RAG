@@ -24,6 +24,9 @@ import { consumeDailyQuota, type QuotaResult } from "@/lib/server/quota";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+const ENABLE_CHAT_STREAM_PROXY =
+    process.env.ENABLE_CHAT_STREAM_PROXY?.trim().toLowerCase() === "true";
+
 interface ChatProxyRequest {
     question: string;
     session_id: string;
@@ -214,6 +217,10 @@ export async function POST(request: NextRequest) {
     };
 
     // ── Try SSE streaming first ──
+    if (!ENABLE_CHAT_STREAM_PROXY) {
+        return fallbackToPolling(backendPayload, generationId, user.id, quota);
+    }
+
     let upstream: Response;
     try {
         upstream = await fetch(buildBackendUrl("/chat/stream"), {

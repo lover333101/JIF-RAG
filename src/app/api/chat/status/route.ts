@@ -27,6 +27,7 @@ export const dynamic = "force-dynamic";
 
 const GENERATION_EXPIRY_GRACE_MS = 1000 * 60 * 20;
 const STALE_GENERATION_MS = 1000 * 60 * 5;
+const STREAM_TASK_STALE_MS = 1000 * 60;
 
 async function fetchUpstreamThinking(taskId: string): Promise<
     | {
@@ -244,6 +245,10 @@ export async function GET(request: NextRequest) {
     let thinkingSteps: ThinkingStep[] = [];
     let mode: "auto" | "light" | "heavy" | undefined;
     let routingReason: string | undefined;
+    const createdAt = Date.parse(generation.createdAt);
+    const generationAgeMs = Number.isFinite(createdAt)
+        ? Date.now() - createdAt
+        : 0;
     if (generation.taskId) {
         const thinking = await fetchUpstreamThinking(generation.taskId).catch(
             () => null
@@ -269,10 +274,12 @@ export async function GET(request: NextRequest) {
         } else {
             // Upstream unreachable or task not found (e.g. interrupted stream).
             // If the generation has been processing for too long, expire it.
-            const createdAt = Date.parse(generation.createdAt);
+            const staleThresholdMs = generation.taskId.startsWith("stream-")
+                ? STREAM_TASK_STALE_MS
+                : STALE_GENERATION_MS;
             if (
                 Number.isFinite(createdAt) &&
-                Date.now() - createdAt > STALE_GENERATION_MS
+                generationAgeMs > staleThresholdMs
             ) {
                 await markChatGenerationFailed({
                     generationId: generation.id,
@@ -290,6 +297,18 @@ export async function GET(request: NextRequest) {
                 );
             }
         }
+    } else if (Number.isFinite(createdAt) && generationAgeMs > STALE_GENERATION_MS) {
+        await markChatGenerationFailed({
+            generationId: generation.id,
+            userId: user.id,
+            status: "expired",
+            errorMessage:
+                "Generation stalled before task assignment. Please try again.",
+        }).catch(() => undefined);
+        return NextResponse.json(
+            { error: "Generation stalled before task assignment. Please try again." },
+            { status: 422, headers: { "Cache-Control": "no-store" } }
+        );
     }
 
     return NextResponse.json(
