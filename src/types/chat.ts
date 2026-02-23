@@ -14,6 +14,18 @@ export interface ChatMessage {
     isLoading?: boolean;
     isError?: boolean;
     errorMessage?: string;
+    responseMode?: "auto" | "light" | "heavy";
+    thinkingStatus?: string;
+    thinkingSteps?: ThinkingStep[];
+    routingReason?: string;
+}
+
+export interface ThinkingStep {
+    id: string;
+    label: string;
+    detail?: string;
+    state: "pending" | "active" | "done";
+    updated_at_ms?: number;
 }
 
 export interface CitationMention {
@@ -49,9 +61,7 @@ export interface Session {
 export interface ChatRequest {
     question: string;
     session_id: string;
-    top_k?: number;
-    temperature?: number;
-    active_index_names?: string[];
+    response_mode?: "auto" | "light" | "heavy";
 }
 
 export interface ChatResponse {
@@ -64,11 +74,6 @@ export interface ChatResponse {
         remaining: number;
         reset_at: string;
     };
-}
-
-export interface IndexInfo {
-    name: string;
-    label?: string;
 }
 
 export type EvidenceStrength = "strong" | "moderate" | "weak" | "none";
@@ -90,7 +95,6 @@ export interface QuotaSummary {
 export interface ConversationRecord {
     id: string;
     title: string;
-    active_index_names?: string[];
     created_at: string;
     updated_at: string;
 }
@@ -102,5 +106,6 @@ export interface StoredMessageRecord {
     content: string;
     markdown_content?: string;
     citations?: string[];
+    matches?: MatchItem[];
     created_at: string;
 }

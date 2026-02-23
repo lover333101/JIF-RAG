@@ -408,6 +408,32 @@ body {
   background: var(--color-accent);
 }
 
+/* ─── Thinking trace card ─── */
+.thinking-trace-card {
+  will-change: transform, opacity;
+}
+
+@keyframes thinking-shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.thinking-shimmer-bar {
+  background-size: 200% 100%;
+  background-image: linear-gradient(90deg,
+      var(--color-warning) 0%,
+      var(--color-accent) 45%,
+      rgba(255, 255, 255, 0.6) 50%,
+      var(--color-accent) 55%,
+      var(--color-warning) 100%);
+  animation: thinking-shimmer 2s ease-in-out infinite;
+}
+
 /* --- Extended markdown coverage --- */
 .prose-jiff hr {
   border: 0;
@@ -492,8 +518,96 @@ body {
 
 @media (max-width: 760px) {
   :root {
-    --sidebar-width: min(86vw, 300px);
-    --drawer-width: min(100vw, 340px);
+    --sidebar-width: min(84vw, 300px);
+    --drawer-width: 100vw;
     --composer-max: 100%;
+    --header-height: 50px;
+    --text-3xl: 1.75rem;
+    --text-4xl: 2.25rem;
+  }
+
+  body {
+    font-size: var(--text-sm);
+  }
+}
+
+/* ─── Mobile overlay panels ─── */
+.mobile-overlay-backdrop {
+  display: none;
+}
+
+@media (max-width: 760px) {
+  .mobile-overlay-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 29;
+    background: rgba(8, 8, 8, 0.45);
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+  }
+
+  .mobile-sidebar-overlay {
+    position: fixed !important;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    z-index: 40 !important;
+    box-shadow: var(--shadow-xl);
+  }
+
+  .mobile-drawer-overlay {
+    position: fixed !important;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 40 !important;
+    box-shadow: var(--shadow-xl);
+  }
+}
+
+/* ─── Touch-friendly minimum targets ─── */
+@media (pointer: coarse) {
+
+  button,
+  a,
+  [role="button"],
+  select,
+  input[type="range"] {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  input[type="email"],
+  input[type="text"],
+  input[type="password"],
+  textarea {
+    min-height: 44px;
+    font-size: 16px;
+    /* prevent zoom on iOS */
+  }
+}
+
+/* ─── Mobile content adjustments ─── */
+@media (max-width: 760px) {
+  .prose-jiff h1 {
+    font-size: var(--text-xl);
+  }
+
+  .prose-jiff h2 {
+    font-size: var(--text-lg);
+  }
+
+  .prose-jiff h3 {
+    font-size: var(--text-md);
+  }
+
+  .prose-jiff table {
+    font-size: var(--text-xs);
+  }
+
+  .prose-jiff th,
+  .prose-jiff td {
+    padding: 0.35em 0.45em;
   }
 }

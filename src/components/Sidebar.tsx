@@ -2,7 +2,6 @@
 
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { createConversationId } from "@/lib/conversation-id";
 import {
@@ -95,7 +94,6 @@ const LimitIcon = () => (
 export default function Sidebar() {
     const { state, dispatch } = useApp();
     const { sessions, activeSessionId, sidebarOpen } = state;
-    const router = useRouter();
     const [accountSummary, setAccountSummary] = useState<AccountSummary | null>(
         null
     );
@@ -115,13 +113,12 @@ export default function Sidebar() {
             id,
             title: "New Session",
         });
-        router.push(`/chat/${id}`);
+        window.history.pushState(null, "", `/chat/${id}`);
 
         try {
             await createConversation({
                 id,
                 title: "New Session",
-                active_index_names: state.activeIndexNames,
             });
         } catch (error) {
             const message =
@@ -136,7 +133,7 @@ export default function Sidebar() {
             type: "SWITCH_SESSION",
             id,
         });
-        router.push(`/chat/${id}`);
+        window.history.pushState(null, "", `/chat/${id}`);
     };
 
     const handleArchiveSession = async (id: string) => {
@@ -156,7 +153,7 @@ export default function Sidebar() {
         if (remainingIds.length > 0) {
             const nextId = remainingIds[0];
             dispatch({ type: "SWITCH_SESSION", id: nextId });
-            router.push(`/chat/${nextId}`);
+            window.history.pushState(null, "", `/chat/${nextId}`);
             return;
         }
 
@@ -197,7 +194,7 @@ export default function Sidebar() {
             style={{
                 width: "var(--sidebar-width)",
                 minWidth: "var(--sidebar-width)",
-                height: "100vh",
+                height: "100dvh",
                 background: "var(--bg-sidebar)",
                 color: "var(--text-inverse)",
                 display: "flex",
@@ -208,361 +205,361 @@ export default function Sidebar() {
                 pointerEvents: sidebarOpen ? "auto" : "none",
             }}
         >
+            <div
+                style={{
+                    padding: "var(--space-5)",
+                    borderBottom: "1px solid rgba(255,255,255,0.06)",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "var(--space-3)",
+                }}
+            >
+                <div
+                    style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "var(--space-3)",
+                    }}
+                >
                     <div
                         style={{
-                            padding: "var(--space-5)",
-                            borderBottom: "1px solid rgba(255,255,255,0.06)",
+                            width: 32,
+                            height: 32,
+                            borderRadius: "var(--radius-md)",
+                            background: "var(--color-accent)",
                             display: "flex",
                             alignItems: "center",
-                            gap: "var(--space-3)",
+                            justifyContent: "center",
+                            fontFamily: "var(--font-serif)",
+                            fontSize: "var(--text-lg)",
+                            fontWeight: 400,
+                            color: "var(--color-pure-white)",
                         }}
                     >
-                        <div
+                        J
+                    </div>
+                    <div>
+                        <h1
                             style={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "var(--space-3)",
+                                fontFamily: "var(--font-serif)",
+                                fontSize: "var(--text-xl)",
+                                fontWeight: 400,
+                                lineHeight: 1,
+                                letterSpacing: "-0.01em",
                             }}
                         >
-                            <div
-                                style={{
-                                    width: 32,
-                                    height: 32,
-                                    borderRadius: "var(--radius-md)",
-                                    background: "var(--color-accent)",
-                                    display: "flex",
-                                    alignItems: "center",
-                                    justifyContent: "center",
-                                    fontFamily: "var(--font-serif)",
-                                    fontSize: "var(--text-lg)",
-                                    fontWeight: 400,
-                                    color: "var(--color-pure-white)",
-                                }}
-                            >
-                                J
-                            </div>
-                            <div>
-                                <h1
-                                    style={{
-                                        fontFamily: "var(--font-serif)",
-                                        fontSize: "var(--text-xl)",
-                                        fontWeight: 400,
-                                        lineHeight: 1,
-                                        letterSpacing: "-0.01em",
-                                    }}
-                                >
-                                    Jiff
-                                </h1>
-                                <span
-                                    style={{
-                                        fontSize: "var(--text-xs)",
-                                        color: "var(--color-stone)",
-                                        fontWeight: 300,
-                                        letterSpacing: "0.04em",
-                                        textTransform: "uppercase",
-                                    }}
-                                >
-                                    Strategy Assistant
-                                </span>
-                            </div>
-                        </div>
-
-                    </div>
-
-                    <div style={{ padding: "var(--space-4) var(--space-5)" }}>
-                        <button
-                            onClick={handleCreateSession}
-                            id="btn-new-session"
+                            Jiff
+                        </h1>
+                        <span
                             style={{
-                                width: "100%",
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                gap: "var(--space-2)",
-                                padding: "var(--space-3) var(--space-4)",
-                                background: "rgba(255,255,255,0.06)",
-                                border: "1px solid rgba(255,255,255,0.1)",
-                                borderRadius: "var(--radius-md)",
-                                color: "var(--text-inverse)",
-                                fontSize: "var(--text-sm)",
-                                fontFamily: "var(--font-sans)",
-                                fontWeight: 500,
-                                cursor: "pointer",
-                                transition:
-                                    "all var(--duration-fast) var(--ease-out)",
-                            }}
-                        >
-                            <PlusIcon /> New Session
-                        </button>
-                    </div>
-
-                    <div
-                        style={{
-                            flex: 1,
-                            overflowY: "auto",
-                            padding: "0 var(--space-3)",
-                        }}
-                    >
-                        <div
-                            style={{
-                                padding: "var(--space-2)",
                                 fontSize: "var(--text-xs)",
-                                fontWeight: 500,
                                 color: "var(--color-stone)",
+                                fontWeight: 300,
+                                letterSpacing: "0.04em",
                                 textTransform: "uppercase",
-                                letterSpacing: "0.08em",
                             }}
                         >
-                            Sessions
-                        </div>
-                        <AnimatePresence>
-                            {sessions.map((session) => {
-                                const isActive = session.id === activeSessionId;
-                                return (
-                                    <motion.div
-                                        key={session.id}
-                                        initial={{ opacity: 0, y: -8 }}
-                                        animate={{ opacity: 1, y: 0 }}
-                                        exit={{ opacity: 0, x: -20 }}
-                                        transition={{ duration: 0.2 }}
+                            Strategy Assistant
+                        </span>
+                    </div>
+                </div>
+
+            </div>
+
+            <div style={{ padding: "var(--space-4) var(--space-5)" }}>
+                <button
+                    onClick={handleCreateSession}
+                    id="btn-new-session"
+                    style={{
+                        width: "100%",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: "var(--space-2)",
+                        padding: "var(--space-3) var(--space-4)",
+                        background: "rgba(255,255,255,0.06)",
+                        border: "1px solid rgba(255,255,255,0.1)",
+                        borderRadius: "var(--radius-md)",
+                        color: "var(--text-inverse)",
+                        fontSize: "var(--text-sm)",
+                        fontFamily: "var(--font-sans)",
+                        fontWeight: 500,
+                        cursor: "pointer",
+                        transition:
+                            "all var(--duration-fast) var(--ease-out)",
+                    }}
+                >
+                    <PlusIcon /> New Session
+                </button>
+            </div>
+
+            <div
+                style={{
+                    flex: 1,
+                    overflowY: "auto",
+                    padding: "0 var(--space-3)",
+                }}
+            >
+                <div
+                    style={{
+                        padding: "var(--space-2)",
+                        fontSize: "var(--text-xs)",
+                        fontWeight: 500,
+                        color: "var(--color-stone)",
+                        textTransform: "uppercase",
+                        letterSpacing: "0.08em",
+                    }}
+                >
+                    Sessions
+                </div>
+                <AnimatePresence>
+                    {sessions.map((session) => {
+                        const isActive = session.id === activeSessionId;
+                        return (
+                            <motion.div
+                                key={session.id}
+                                initial={{ opacity: 0, y: -8 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, x: -20 }}
+                                transition={{ duration: 0.2 }}
+                            >
+                                <button
+                                    onClick={() => handleSwitchSession(session.id)}
+                                    id={`session-${session.id}`}
+                                    style={{
+                                        width: "100%",
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: "var(--space-2)",
+                                        padding: "var(--space-3)",
+                                        background: isActive
+                                            ? "rgba(196, 122, 74, 0.15)"
+                                            : "transparent",
+                                        border: "none",
+                                        borderRadius: "var(--radius-md)",
+                                        color: isActive
+                                            ? "var(--color-accent)"
+                                            : "var(--color-stone)",
+                                        fontSize: "var(--text-sm)",
+                                        fontFamily: "var(--font-sans)",
+                                        fontWeight: isActive ? 500 : 400,
+                                        cursor: "pointer",
+                                        textAlign: "start",
+                                        transition:
+                                            "all var(--duration-fast) var(--ease-out)",
+                                        marginBottom: 2,
+                                    }}
+                                >
+                                    <ChatIcon />
+                                    <span
+                                        style={{
+                                            flex: 1,
+                                            overflow: "hidden",
+                                            textOverflow: "ellipsis",
+                                            whiteSpace: "nowrap",
+                                        }}
                                     >
-                                        <button
-                                            onClick={() => handleSwitchSession(session.id)}
-                                            id={`session-${session.id}`}
+                                        {session.title}
+                                    </span>
+                                    {isActive && (
+                                        <span
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                void handleArchiveSession(
+                                                    session.id
+                                                );
+                                            }}
+                                            role="button"
+                                            tabIndex={0}
+                                            aria-label="Clear session"
                                             style={{
-                                                width: "100%",
                                                 display: "flex",
                                                 alignItems: "center",
-                                                gap: "var(--space-2)",
-                                                padding: "var(--space-3)",
-                                                background: isActive
-                                                    ? "rgba(196, 122, 74, 0.15)"
-                                                    : "transparent",
-                                                border: "none",
-                                                borderRadius: "var(--radius-md)",
-                                                color: isActive
-                                                    ? "var(--color-accent)"
-                                                    : "var(--color-stone)",
-                                                fontSize: "var(--text-sm)",
-                                                fontFamily: "var(--font-sans)",
-                                                fontWeight: isActive ? 500 : 400,
+                                                opacity: 0.55,
                                                 cursor: "pointer",
-                                                textAlign: "start",
-                                                transition:
-                                                    "all var(--duration-fast) var(--ease-out)",
-                                                marginBottom: 2,
                                             }}
                                         >
-                                            <ChatIcon />
-                                            <span
-                                                style={{
-                                                    flex: 1,
-                                                    overflow: "hidden",
-                                                    textOverflow: "ellipsis",
-                                                    whiteSpace: "nowrap",
-                                                }}
-                                            >
-                                                {session.title}
-                                            </span>
-                                            {isActive && (
-                                                <span
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        void handleArchiveSession(
-                                                            session.id
-                                                        );
-                                                    }}
-                                                    role="button"
-                                                    tabIndex={0}
-                                                    aria-label="Clear session"
-                                                    style={{
-                                                        display: "flex",
-                                                        alignItems: "center",
-                                                        opacity: 0.55,
-                                                        cursor: "pointer",
-                                                    }}
-                                                >
-                                                    <TrashIcon />
-                                                </span>
-                                            )}
-                                        </button>
-                                    </motion.div>
-                                );
-                            })}
-                        </AnimatePresence>
-                    </div>
+                                            <TrashIcon />
+                                        </span>
+                                    )}
+                                </button>
+                            </motion.div>
+                        );
+                    })}
+                </AnimatePresence>
+            </div>
 
+            <div
+                style={{
+                    padding: "var(--space-4) var(--space-5)",
+                    borderTop: "1px solid rgba(255,255,255,0.06)",
+                    display: "grid",
+                    gap: "var(--space-3)",
+                }}
+            >
+                <Link
+                    href="/account"
+                    id="btn-account-settings"
+                    style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        gap: "var(--space-3)",
+                        textDecoration: "none",
+                        color: "var(--text-inverse)",
+                        border: "1px solid rgba(255,255,255,0.1)",
+                        background: "rgba(255,255,255,0.04)",
+                        borderRadius: "var(--radius-md)",
+                        padding: "var(--space-3) var(--space-3)",
+                    }}
+                >
                     <div
                         style={{
-                            padding: "var(--space-4) var(--space-5)",
-                            borderTop: "1px solid rgba(255,255,255,0.06)",
-                            display: "grid",
-                            gap: "var(--space-3)",
+                            minWidth: 0,
                         }}
                     >
-                        <Link
-                            href="/account"
-                            id="btn-account-settings"
-                            style={{
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "space-between",
-                                gap: "var(--space-3)",
-                                textDecoration: "none",
-                                color: "var(--text-inverse)",
-                                border: "1px solid rgba(255,255,255,0.1)",
-                                background: "rgba(255,255,255,0.04)",
-                                borderRadius: "var(--radius-md)",
-                                padding: "var(--space-3) var(--space-3)",
-                            }}
-                        >
-                            <div
-                                style={{
-                                    minWidth: 0,
-                                }}
-                            >
-                                <div
-                                    style={{
-                                        fontSize: "var(--text-sm)",
-                                        fontWeight: 600,
-                                        lineHeight: 1.1,
-                                        marginBottom: 2,
-                                    }}
-                                >
-                                    Account Settings
-                                </div>
-                                <div
-                                    style={{
-                                        fontSize: "var(--text-xs)",
-                                        color: "var(--color-stone)",
-                                        overflow: "hidden",
-                                        textOverflow: "ellipsis",
-                                        whiteSpace: "nowrap",
-                                    }}
-                                >
-                                    {accountSummary?.display_name ||
-                                        accountSummary?.email ||
-                                        "Manage your account"}
-                                </div>
-                            </div>
-                            <SettingsIcon />
-                        </Link>
-
-                        <button
-                            type="button"
-                            id="btn-expand-daily-limit"
-                            onClick={() =>
-                                dispatch({
-                                    type: "OPEN_LIMIT_MODAL",
-                                    message:
-                                        "You reached your daily limit. Communicate with Jose Ahmad at hello@joseahmad.com to expand your daily limit, otherwise wait until the next day.",
-                                })
-                            }
-                            style={{
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "space-between",
-                                gap: "var(--space-3)",
-                                textDecoration: "none",
-                                color: "var(--text-inverse)",
-                                border: "1px solid rgba(255,255,255,0.1)",
-                                background: "rgba(196, 122, 74, 0.16)",
-                                borderRadius: "var(--radius-md)",
-                                padding: "var(--space-3) var(--space-3)",
-                                cursor: "pointer",
-                            }}
-                        >
-                            <div
-                                style={{
-                                    minWidth: 0,
-                                    textAlign: "left",
-                                }}
-                            >
-                                <div
-                                    style={{
-                                        fontSize: "var(--text-sm)",
-                                        fontWeight: 600,
-                                        lineHeight: 1.1,
-                                        marginBottom: 2,
-                                    }}
-                                >
-                                    Expand Daily Limit
-                                </div>
-                                <div
-                                    style={{
-                                        fontSize: "var(--text-xs)",
-                                        color: "var(--color-stone)",
-                                        overflow: "hidden",
-                                        textOverflow: "ellipsis",
-                                        whiteSpace: "nowrap",
-                                    }}
-                                >
-                                    Contact Jose Ahmad
-                                </div>
-                            </div>
-                            <LimitIcon />
-                        </button>
-
                         <div
                             style={{
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "space-between",
-                                fontSize: "var(--text-xs)",
-                                color: "var(--color-stone)",
+                                fontSize: "var(--text-sm)",
+                                fontWeight: 600,
+                                lineHeight: 1.1,
+                                marginBottom: 2,
                             }}
                         >
-                            <span
-                                style={{
-                                    textTransform: "uppercase",
-                                    letterSpacing: "0.08em",
-                                }}
-                            >
-                                Messages
-                            </span>
-                            <span
-                                style={{
-                                    fontFamily: "var(--font-mono)",
-                                    fontSize: "var(--text-sm)",
-                                    color: "var(--text-inverse)",
-                                }}
-                            >
-                                {typeof accountSummary?.message_count === "number"
-                                    ? accountSummary.message_count.toLocaleString()
-                                    : "--"}
-                            </span>
+                            Account Settings
                         </div>
-
                         <div
                             style={{
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "space-between",
                                 fontSize: "var(--text-xs)",
                                 color: "var(--color-stone)",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                whiteSpace: "nowrap",
                             }}
                         >
-                            <span
-                                style={{
-                                    textTransform: "uppercase",
-                                    letterSpacing: "0.08em",
-                                }}
-                            >
-                                Daily Limit
-                            </span>
-                            <span
-                                style={{
-                                    fontFamily: "var(--font-mono)",
-                                    fontSize: "var(--text-sm)",
-                                    color: "var(--text-inverse)",
-                                }}
-                            >
-                                {dailyUsagePercent !== null
-                                    ? `${dailyUsagePercent}%`
-                                    : "--"}
-                            </span>
+                            {accountSummary?.display_name ||
+                                accountSummary?.email ||
+                                "Manage your account"}
                         </div>
                     </div>
+                    <SettingsIcon />
+                </Link>
+
+                <button
+                    type="button"
+                    id="btn-expand-daily-limit"
+                    onClick={() =>
+                        dispatch({
+                            type: "OPEN_LIMIT_MODAL",
+                            message:
+                                "You reached your daily limit. Communicate with Jose Ahmad at hello@joseahmad.com to expand your daily limit, otherwise wait until the next day.",
+                        })
+                    }
+                    style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        gap: "var(--space-3)",
+                        textDecoration: "none",
+                        color: "var(--text-inverse)",
+                        border: "1px solid rgba(255,255,255,0.1)",
+                        background: "rgba(196, 122, 74, 0.16)",
+                        borderRadius: "var(--radius-md)",
+                        padding: "var(--space-3) var(--space-3)",
+                        cursor: "pointer",
+                    }}
+                >
+                    <div
+                        style={{
+                            minWidth: 0,
+                            textAlign: "left",
+                        }}
+                    >
+                        <div
+                            style={{
+                                fontSize: "var(--text-sm)",
+                                fontWeight: 600,
+                                lineHeight: 1.1,
+                                marginBottom: 2,
+                            }}
+                        >
+                            Expand Daily Limit
+                        </div>
+                        <div
+                            style={{
+                                fontSize: "var(--text-xs)",
+                                color: "var(--color-stone)",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                whiteSpace: "nowrap",
+                            }}
+                        >
+                            Contact Jose Ahmad
+                        </div>
+                    </div>
+                    <LimitIcon />
+                </button>
+
+                <div
+                    style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        fontSize: "var(--text-xs)",
+                        color: "var(--color-stone)",
+                    }}
+                >
+                    <span
+                        style={{
+                            textTransform: "uppercase",
+                            letterSpacing: "0.08em",
+                        }}
+                    >
+                        Messages
+                    </span>
+                    <span
+                        style={{
+                            fontFamily: "var(--font-mono)",
+                            fontSize: "var(--text-sm)",
+                            color: "var(--text-inverse)",
+                        }}
+                    >
+                        {typeof accountSummary?.message_count === "number"
+                            ? accountSummary.message_count.toLocaleString()
+                            : "--"}
+                    </span>
+                </div>
+
+                <div
+                    style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        fontSize: "var(--text-xs)",
+                        color: "var(--color-stone)",
+                    }}
+                >
+                    <span
+                        style={{
+                            textTransform: "uppercase",
+                            letterSpacing: "0.08em",
+                        }}
+                    >
+                        Daily Limit
+                    </span>
+                    <span
+                        style={{
+                            fontFamily: "var(--font-mono)",
+                            fontSize: "var(--text-sm)",
+                            color: "var(--text-inverse)",
+                        }}
+                    >
+                        {dailyUsagePercent !== null
+                            ? `${dailyUsagePercent}%`
+                            : "--"}
+                    </span>
+                </div>
+            </div>
         </motion.aside>
     );
 }

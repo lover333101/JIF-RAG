@@ -16,6 +16,12 @@ const SettingsIcon = () => (
     </svg>
 );
 
+const MODE_OPTIONS = [
+    { value: "auto", label: "Auto" },
+    { value: "light", label: "Light (Fast)" },
+    { value: "heavy", label: "Heavy (Grounded)" },
+] as const;
+
 export default function Composer() {
     const { state, sendMessage, dispatch } = useApp();
     const [input, setInput] = useState("");
@@ -25,7 +31,7 @@ export default function Composer() {
     const handleSend = () => {
         const trimmed = input.trim();
         if (!trimmed || state.isLoading) return;
-        sendMessage(trimmed);
+        sendMessage(trimmed, state.activeSessionId || undefined);
         setInput("");
         if (textareaRef.current) {
             textareaRef.current.style.height = "auto";
@@ -46,11 +52,9 @@ export default function Composer() {
         el.style.height = Math.min(el.scrollHeight, 160) + "px";
     };
 
-    // Active DB chips
-    const activeLabel =
-        state.activeIndexNames.length === 0
-            ? "All databases"
-            : state.activeIndexNames.join(", ");
+    const modeLabel =
+        MODE_OPTIONS.find((item) => item.value === state.responseMode)?.label ??
+        "Auto";
 
     return (
         <div
@@ -58,16 +62,16 @@ export default function Composer() {
                 width: "100%",
                 maxWidth: "var(--composer-max)",
                 margin: "0 auto",
-                padding: "0 var(--space-5) var(--space-6)",
+                padding: "0 clamp(var(--space-3), 3vw, var(--space-5)) var(--space-3)",
             }}
         >
-            {/* Active DB Chip */}
+            {/* Mode Chip */}
             <div
                 style={{
                     display: "flex",
                     alignItems: "center",
                     gap: "var(--space-2)",
-                    marginBottom: "var(--space-3)",
+                    marginBottom: "var(--space-2)",
                     paddingLeft: "var(--space-1)",
                 }}
             >
@@ -90,12 +94,14 @@ export default function Composer() {
                             height: 6,
                             borderRadius: "50%",
                             background:
-                                state.activeIndexNames.length === 0
-                                    ? "var(--color-accent)"
-                                    : "var(--color-success)",
+                                state.responseMode === "heavy"
+                                    ? "var(--color-warning)"
+                                    : state.responseMode === "light"
+                                        ? "var(--color-success)"
+                                        : "var(--color-accent)",
                         }}
                     />
-                    {activeLabel}
+                    Mode: {modeLabel}
                 </div>
             </div>
 
@@ -216,105 +222,16 @@ export default function Composer() {
                         style={{
                             display: "flex",
                             alignItems: "center",
-                            gap: "var(--space-6)",
+                            gap: "var(--space-4)",
                             padding: "var(--space-3) var(--space-4)",
                             borderTop: "1px solid var(--border-subtle)",
+                            flexWrap: "wrap",
                         }}
                     >
-                        {/* top_k */}
-                        <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
-                            <label
-                                htmlFor="control-topk"
-                                style={{
-                                    fontSize: "var(--text-xs)",
-                                    fontWeight: 500,
-                                    color: "var(--text-tertiary)",
-                                    fontFamily: "var(--font-mono)",
-                                    textTransform: "uppercase",
-                                    letterSpacing: "0.05em",
-                                }}
-                            >
-                                top_k
-                            </label>
-                            <input
-                                id="control-topk"
-                                type="range"
-                                min={8}
-                                max={12}
-                                value={state.topK}
-                                onChange={(e) =>
-                                    dispatch({
-                                        type: "SET_TOP_K",
-                                        value: parseInt(e.target.value),
-                                    })
-                                }
-                                style={{
-                                    width: 80,
-                                    accentColor: "var(--color-accent)",
-                                }}
-                            />
-                            <span
-                                style={{
-                                    fontSize: "var(--text-xs)",
-                                    fontFamily: "var(--font-mono)",
-                                    color: "var(--text-secondary)",
-                                    minWidth: 20,
-                                    textAlign: "center",
-                                }}
-                            >
-                                {state.topK}
-                            </span>
-                        </div>
-
-                        {/* temperature */}
-                        <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
-                            <label
-                                htmlFor="control-temp"
-                                style={{
-                                    fontSize: "var(--text-xs)",
-                                    fontWeight: 500,
-                                    color: "var(--text-tertiary)",
-                                    fontFamily: "var(--font-mono)",
-                                    textTransform: "uppercase",
-                                    letterSpacing: "0.05em",
-                                }}
-                            >
-                                temp
-                            </label>
-                            <input
-                                id="control-temp"
-                                type="range"
-                                min={0}
-                                max={20}
-                                value={Math.round(state.temperature * 10)}
-                                onChange={(e) =>
-                                    dispatch({
-                                        type: "SET_TEMPERATURE",
-                                        value: parseInt(e.target.value) / 10,
-                                    })
-                                }
-                                style={{
-                                    width: 80,
-                                    accentColor: "var(--color-accent)",
-                                }}
-                            />
-                            <span
-                                style={{
-                                    fontSize: "var(--text-xs)",
-                                    fontFamily: "var(--font-mono)",
-                                    color: "var(--text-secondary)",
-                                    minWidth: 28,
-                                    textAlign: "center",
-                                }}
-                            >
-                                {state.temperature.toFixed(1)}
-                            </span>
-                        </div>
-
-                        {/* DB Selector */}
+                        {/* Response Mode */}
                         <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)", marginLeft: "auto" }}>
                             <label
-                                htmlFor="control-db"
+                                htmlFor="control-mode"
                                 style={{
                                     fontSize: "var(--text-xs)",
                                     fontWeight: 500,
@@ -324,20 +241,19 @@ export default function Composer() {
                                     letterSpacing: "0.05em",
                                 }}
                             >
-                                DB
+                                Mode
                             </label>
                             <select
-                                id="control-db"
-                                value={
-                                    state.activeIndexNames.length === 0
-                                        ? "__all__"
-                                        : state.activeIndexNames[0]
-                                }
+                                id="control-mode"
+                                value={state.responseMode}
                                 onChange={(e) => {
-                                    const val = e.target.value;
+                                    const val = e.target.value as
+                                        | "auto"
+                                        | "light"
+                                        | "heavy";
                                     dispatch({
-                                        type: "SET_ACTIVE_INDEXES",
-                                        names: val === "__all__" ? [] : [val],
+                                        type: "SET_RESPONSE_MODE",
+                                        mode: val,
                                     });
                                 }}
                                 style={{
@@ -351,10 +267,9 @@ export default function Composer() {
                                     cursor: "pointer",
                                 }}
                             >
-                                <option value="__all__">All databases</option>
-                                {state.availableIndexes.map((idx) => (
-                                    <option key={idx} value={idx}>
-                                        {idx}
+                                {MODE_OPTIONS.map((option) => (
+                                    <option key={option.value} value={option.value}>
+                                        {option.label}
                                     </option>
                                 ))}
                             </select>
@@ -369,7 +284,8 @@ export default function Composer() {
                     textAlign: "center",
                     fontSize: "var(--text-xs)",
                     color: "var(--text-tertiary)",
-                    marginTop: "var(--space-3)",
+                    marginTop: "var(--space-2)",
+                    marginBottom: "var(--space-1)",
                     fontWeight: 300,
                 }}
             >

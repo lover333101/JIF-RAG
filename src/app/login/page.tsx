@@ -36,6 +36,15 @@ export default function LoginPage() {
     const [isLoading, setIsLoading] = useState(false);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
     const [configError, setConfigError] = useState<string | null>(null);
+    const [isMobile, setIsMobile] = useState(false);
+
+    useEffect(() => {
+        const mql = window.matchMedia("(max-width: 760px)");
+        const update = () => setIsMobile(mql.matches);
+        update();
+        mql.addEventListener("change", update);
+        return () => mql.removeEventListener("change", update);
+    }, []);
 
     const readNextPath = () => {
         if (typeof window === "undefined") return "/";
@@ -165,15 +174,17 @@ export default function LoginPage() {
                 />
             ) : null}
 
-            <div style={{ display: "flex", flex: 1, minHeight: "100vh" }}>
+            <div style={{ display: "flex", flexDirection: isMobile ? "column" : "row", flex: 1, minHeight: "100vh" }}>
                 <div
                     style={{
-                        width: "50%",
+                        width: isMobile ? "100%" : "50%",
                         display: "flex",
                         flexDirection: "column",
                         justifyContent: "center",
                         alignItems: "center",
-                        padding: "var(--space-10) var(--space-8)",
+                        padding: isMobile
+                            ? "var(--space-8) var(--space-5)"
+                            : "var(--space-10) var(--space-8)",
                     }}
                 >
                     <div style={{ width: "100%", maxWidth: 400 }}>
@@ -485,104 +496,106 @@ export default function LoginPage() {
                     </div>
                 </div>
 
-                <div
-                    style={{
-                        width: "50%",
-                        background: "var(--color-charcoal)",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        position: "relative",
-                        overflow: "hidden",
-                    }}
-                >
+                {!isMobile && (
                     <div
                         style={{
-                            position: "absolute",
-                            inset: 0,
-                            opacity: 0.04,
-                            pointerEvents: "none",
-                            backgroundImage:
-                                "url(\"data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")",
+                            width: "50%",
+                            background: "var(--color-charcoal)",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            position: "relative",
+                            overflow: "hidden",
                         }}
-                    />
-                    <div
-                        style={{
-                            position: "absolute",
-                            top: "-20%",
-                            right: "-15%",
-                            width: 500,
-                            height: 500,
-                            borderRadius: "50%",
-                            background: "var(--color-accent)",
-                            filter: "blur(160px)",
-                            opacity: 0.2,
-                            pointerEvents: "none",
-                        }}
-                    />
-                    <div
-                        style={{
-                            position: "absolute",
-                            bottom: "-25%",
-                            left: "-10%",
-                            width: 400,
-                            height: 400,
-                            borderRadius: "50%",
-                            background: "var(--color-accent-dim)",
-                            filter: "blur(140px)",
-                            opacity: 0.15,
-                            pointerEvents: "none",
-                        }}
-                    />
-
-                    <div style={{ position: "relative", zIndex: 10, maxWidth: 420, padding: "0 var(--space-10)" }}>
-                        <h2
+                    >
+                        <div
                             style={{
-                                fontFamily: "var(--font-serif)",
-                                fontSize: "var(--text-4xl)",
-                                fontWeight: 400,
-                                color: "var(--color-ivory)",
-                                lineHeight: "var(--leading-tight)",
-                                letterSpacing: "-0.02em",
-                                marginBottom: "var(--space-6)",
+                                position: "absolute",
+                                inset: 0,
+                                opacity: 0.04,
+                                pointerEvents: "none",
+                                backgroundImage:
+                                    "url(\"data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")",
                             }}
-                        >
-                            The knowledge of <span style={{ color: "var(--color-accent)" }}>strategy</span>, between your hands.
-                        </h2>
-
-                        <p
+                        />
+                        <div
                             style={{
-                                fontSize: "var(--text-base)",
-                                color: "var(--color-stone)",
-                                lineHeight: "var(--leading-relaxed)",
-                                marginBottom: "var(--space-10)",
+                                position: "absolute",
+                                top: "-20%",
+                                right: "-15%",
+                                width: 500,
+                                height: 500,
+                                borderRadius: "50%",
+                                background: "var(--color-accent)",
+                                filter: "blur(160px)",
+                                opacity: 0.2,
+                                pointerEvents: "none",
                             }}
-                        >
-                            Ask complex questions across your private knowledge bases.
-                            Inspect sources, verify evidence, and trust every answer.
-                        </p>
+                        />
+                        <div
+                            style={{
+                                position: "absolute",
+                                bottom: "-25%",
+                                left: "-10%",
+                                width: 400,
+                                height: 400,
+                                borderRadius: "50%",
+                                background: "var(--color-accent-dim)",
+                                filter: "blur(140px)",
+                                opacity: 0.15,
+                                pointerEvents: "none",
+                            }}
+                        />
 
-                        <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--space-2)" }}>
-                            {["Source-grounded", "Multi-database", "Evidence-backed"].map((label) => (
-                                <span
-                                    key={label}
-                                    style={{
-                                        padding: "var(--space-1) var(--space-3)",
-                                        background: "rgba(196, 122, 74, 0.12)",
-                                        border: "1px solid rgba(196, 122, 74, 0.2)",
-                                        borderRadius: "var(--radius-full)",
-                                        fontSize: "var(--text-xs)",
-                                        fontWeight: 500,
-                                        color: "var(--color-accent)",
-                                        letterSpacing: "0.02em",
-                                    }}
-                                >
-                                    {label}
-                                </span>
-                            ))}
+                        <div style={{ position: "relative", zIndex: 10, maxWidth: 420, padding: "0 var(--space-10)" }}>
+                            <h2
+                                style={{
+                                    fontFamily: "var(--font-serif)",
+                                    fontSize: "var(--text-4xl)",
+                                    fontWeight: 400,
+                                    color: "var(--color-ivory)",
+                                    lineHeight: "var(--leading-tight)",
+                                    letterSpacing: "-0.02em",
+                                    marginBottom: "var(--space-6)",
+                                }}
+                            >
+                                The knowledge of <span style={{ color: "var(--color-accent)" }}>strategy</span>, between your hands.
+                            </h2>
+
+                            <p
+                                style={{
+                                    fontSize: "var(--text-base)",
+                                    color: "var(--color-stone)",
+                                    lineHeight: "var(--leading-relaxed)",
+                                    marginBottom: "var(--space-10)",
+                                }}
+                            >
+                                Ask complex questions across your private knowledge bases.
+                                Inspect sources, verify evidence, and trust every answer.
+                            </p>
+
+                            <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--space-2)" }}>
+                                {["Source-grounded", "Multi-database", "Evidence-backed"].map((label) => (
+                                    <span
+                                        key={label}
+                                        style={{
+                                            padding: "var(--space-1) var(--space-3)",
+                                            background: "rgba(196, 122, 74, 0.12)",
+                                            border: "1px solid rgba(196, 122, 74, 0.2)",
+                                            borderRadius: "var(--radius-full)",
+                                            fontSize: "var(--text-xs)",
+                                            fontWeight: 500,
+                                            color: "var(--color-accent)",
+                                            letterSpacing: "0.02em",
+                                        }}
+                                    >
+                                        {label}
+                                    </span>
+                                ))}
+                            </div>
                         </div>
                     </div>
-                </div>
+                )}
             </div>
         </div>
     );

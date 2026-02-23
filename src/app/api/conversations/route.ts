@@ -7,17 +7,6 @@ import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-function normalizeIndexNames(raw: unknown): string[] {
-    if (!Array.isArray(raw)) return [];
-    const out = new Set<string>();
-    for (const item of raw) {
-        if (typeof item !== "string") continue;
-        const trimmed = item.trim();
-        if (trimmed) out.add(trimmed);
-    }
-    return [...out];
-}
-
 export async function GET() {
     const user = await getAuthenticatedUser();
     if (!user) {
@@ -30,7 +19,7 @@ export async function GET() {
     const admin = getSupabaseAdminClient();
     const { data, error } = await admin
         .from("conversations")
-        .select("id,title,active_index_names,created_at,updated_at")
+        .select("id,title,created_at,updated_at")
         .eq("user_id", user.id)
         .is("archived_at", null)
         .order("updated_at", { ascending: false });
@@ -83,7 +72,6 @@ export async function POST(request: NextRequest) {
         typeof body.title === "string" && body.title.trim()
             ? body.title.trim().slice(0, 120)
             : "New Session";
-    const activeIndexNames = normalizeIndexNames(body.active_index_names);
 
     const admin = getSupabaseAdminClient();
     const now = new Date().toISOString();
@@ -93,11 +81,10 @@ export async function POST(request: NextRequest) {
             id,
             user_id: user.id,
             title,
-            active_index_names: activeIndexNames,
             created_at: now,
             updated_at: now,
         })
-        .select("id,title,active_index_names,created_at,updated_at")
+        .select("id,title,created_at,updated_at")
         .single();
 
     if (error) {

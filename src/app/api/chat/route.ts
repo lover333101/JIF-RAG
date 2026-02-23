@@ -2,12 +2,17 @@ import { NextRequest, NextResponse } from "next/server";
 import { isValidConversationId } from "@/lib/conversation-id";
 import { getAuthenticatedUser } from "@/lib/server/auth";
 import {
+    createChatGeneration,
     ensureConversationOwnedByUser,
     getAllowedIndexesForUser,
-    hasUnauthorizedRequestedIndexes,
+    markChatGenerationCompleted,
+    markChatGenerationFailed,
     resolveActiveIndexes,
     saveChatMessage,
+    setChatGenerationTaskId,
+    getConversationHistoryForRag,
 } from "@/lib/server/conversations";
+import { startChatGenerationMonitor } from "@/lib/server/chat-generation-monitor";
 import {
     buildBackendHeaders,
     buildBackendUrl,
@@ -24,27 +29,21 @@ interface ChatProxyRequest {
     session_id: string;
     top_k?: number;
     temperature?: number;
-    active_index_names?: string[];
+    response_mode?: "auto" | "light" | "heavy";
 }
-
-type UpstreamMatch = {
-    id?: unknown;
-    score?: unknown;
-    source?: unknown;
-};
 
 function errorResponse(message: string, status: number, quota?: QuotaResult) {
     const response = NextResponse.json(
         quota
             ? {
-                  error: message,
-                  quota: {
-                      limit: quota.limit,
-                      used: quota.used,
-                      remaining: quota.remaining,
-                      reset_at: quota.resetAt,
-                  },
-              }
+                error: message,
+                quota: {
+                    limit: quota.limit,
+                    used: quota.used,
+                    remaining: quota.remaining,
+                    reset_at: quota.resetAt,
+                },
+            }
             : { error: message },
         { status, headers: { "Cache-Control": "no-store" } }
     );
@@ -59,75 +58,6 @@ function attachQuotaHeaders(response: NextResponse, quota: QuotaResult) {
     response.headers.set("X-RateLimit-Remaining", String(quota.remaining));
     response.headers.set("X-RateLimit-Used", String(quota.used));
     response.headers.set("X-RateLimit-Reset", quota.resetAt);
-}
-
-function sourceAlias(index: number): string {
-    return `Source #${String(index + 1).padStart(2, "0")}`;
-}
-
-function normalizeSourceToken(raw: string): string {
-    const trimmed = raw.trim();
-    if (!trimmed) return "";
-    if (trimmed.toLowerCase().startsWith("source=")) {
-        return trimmed.slice(7).trim();
-    }
-    return trimmed;
-}
-
-function sanitizeAnswerCitations(
-    answer: string,
-    aliasMap: Map<string, string>
-): string {
-    return answer.replace(/\[([^\]\n]+)\](?!\()/g, (full, tokenValue: string) => {
-        const normalized = normalizeSourceToken(tokenValue);
-        const alias = aliasMap.get(normalized);
-        if (!alias) return full;
-        return `[${alias}]`;
-    });
-}
-
-function sanitizeEvidence(payload: Record<string, unknown>) {
-    const rawAnswer = typeof payload.answer === "string" ? payload.answer : "";
-    if (!rawAnswer.trim()) {
-        return null;
-    }
-
-    const upstreamMatches = Array.isArray(payload.matches)
-        ? (payload.matches as UpstreamMatch[])
-        : [];
-
-    const aliasMap = new Map<string, string>();
-    const sources: string[] = [];
-
-    for (const item of upstreamMatches) {
-        const source =
-            typeof item?.source === "string" ? item.source.trim() : "";
-        if (!source || aliasMap.has(source)) continue;
-        const alias = sourceAlias(aliasMap.size);
-        aliasMap.set(source, alias);
-        sources.push(alias);
-    }
-
-    const matches = upstreamMatches
-        .map((item, index) => {
-            const source =
-                typeof item?.source === "string" ? item.source.trim() : "";
-            const alias = source ? aliasMap.get(source) : undefined;
-            const score =
-                typeof item?.score === "number" && Number.isFinite(item.score)
-                    ? item.score
-                    : 0;
-            if (!alias) return null;
-            return {
-                id: `m-${index + 1}`,
-                score,
-                source: alias,
-            };
-        })
-        .filter(Boolean);
-
-    const answer = sanitizeAnswerCitations(rawAnswer, aliasMap);
-    return { answer, sources, matches };
 }
 
 function parseChatRequest(raw: unknown): ChatProxyRequest | null {
@@ -146,14 +76,14 @@ function parseChatRequest(raw: unknown): ChatProxyRequest | null {
             ? record.temperature
             : undefined;
 
-    const rawIndexes = Array.isArray(record.active_index_names)
-        ? record.active_index_names
-        : undefined;
-    const activeIndexNames =
-        rawIndexes
-            ?.filter((value): value is string => typeof value === "string")
-            .map((value) => value.trim())
-            .filter(Boolean) ?? undefined;
+    const responseModeRaw =
+        typeof record.response_mode === "string"
+            ? record.response_mode.trim().toLowerCase()
+            : "auto";
+    const responseMode =
+        responseModeRaw === "light" || responseModeRaw === "heavy"
+            ? responseModeRaw
+            : "auto";
 
     if (
         !question ||
@@ -175,7 +105,7 @@ function parseChatRequest(raw: unknown): ChatProxyRequest | null {
         session_id: sessionId,
         top_k: topK,
         temperature,
-        active_index_names: activeIndexNames,
+        response_mode: responseMode,
     };
 }
 
@@ -205,17 +135,8 @@ export async function POST(request: NextRequest) {
         return errorResponse(message, 500);
     }
 
-    if (
-        hasUnauthorizedRequestedIndexes({
-            requested: parsedRequest.active_index_names,
-            allowed: allowedIndexes,
-        })
-    ) {
-        return errorResponse("Requested index is not allowed for this account.", 403);
-    }
-
     const activeIndexes = resolveActiveIndexes({
-        requested: parsedRequest.active_index_names,
+        requested: undefined,
         allowed: allowedIndexes,
     });
 
@@ -263,18 +184,213 @@ export async function POST(request: NextRequest) {
         return errorResponse(message, 500);
     }
 
+    let generationId: string;
+    try {
+        const generation = await createChatGeneration({
+            conversationId: parsedRequest.session_id,
+            userId: user.id,
+        });
+        generationId = generation.id;
+    } catch (error) {
+        const message =
+            error instanceof Error
+                ? error.message
+                : "Failed to initialize chat generation.";
+        return errorResponse(message, 500, quota);
+    }
+
+    let chatHistory: { role: string; content: string }[] = [];
+    try {
+        chatHistory = await getConversationHistoryForRag(parsedRequest.session_id, 10);
+    } catch (error) {
+        console.error("Failed to fetch chat history, proceeding with empty history:", error);
+    }
+
+    const backendPayload = {
+        ...parsedRequest,
+        chat_history: chatHistory,
+        active_index_names: activeIndexes.length > 0 ? activeIndexes : undefined,
+        response_mode: parsedRequest.response_mode ?? "auto",
+    };
+
+    // ── Try SSE streaming first ──
+    let upstream: Response;
+    try {
+        upstream = await fetch(buildBackendUrl("/chat/stream"), {
+            method: "POST",
+            headers: buildBackendHeaders({ "Content-Type": "application/json" }),
+            body: JSON.stringify(backendPayload),
+            cache: "no-store",
+        });
+    } catch {
+        // Streaming endpoint unavailable — fall back to polling
+        return fallbackToPolling(backendPayload, generationId, user.id, quota);
+    }
+
+    if (!upstream.ok || !upstream.body) {
+        // Streaming failed — fall back to polling
+        return fallbackToPolling(backendPayload, generationId, user.id, quota);
+    }
+
+    // Mark generation as associated with streaming (no task_id needed)
+    try {
+        await setChatGenerationTaskId({
+            generationId,
+            userId: user.id,
+            taskId: `stream-${generationId}`,
+        });
+    } catch {
+        // Non-critical, continue
+    }
+
+    // ── Proxy SSE stream to client, intercept events for persistence ──
+    console.info("[chat/route] Streaming path active for generation=%s", generationId);
+
+    const quotaHeaders: Record<string, string> = {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache, no-store, must-revalidate",
+        "Connection": "keep-alive",
+        "X-Accel-Buffering": "no",
+        "Transfer-Encoding": "chunked",
+        "X-RateLimit-Limit": String(quota.limit),
+        "X-RateLimit-Remaining": String(quota.remaining),
+        "X-RateLimit-Used": String(quota.used),
+        "X-RateLimit-Reset": quota.resetAt,
+    };
+
+    const encoder = new TextEncoder();
+    const decoder = new TextDecoder();
+    const metaEvent = `data: ${JSON.stringify({
+        type: "meta",
+        generation_id: generationId,
+        quota: {
+            limit: quota.limit,
+            used: quota.used,
+            remaining: quota.remaining,
+            reset_at: quota.resetAt,
+        },
+    })}\n\n`;
+
+    const upstreamReader = upstream.body!.getReader();
+
+    // Track stream content for persistence
+    let sseBuffer = "";
+    let streamAnswer = "";
+    let streamSources: string[] = [];
+    let streamMatches: unknown[] = [];
+    let gotDoneEvent = false;
+
+    function parseSSEChunk(raw: Uint8Array) {
+        sseBuffer += decoder.decode(raw, { stream: true });
+        const lines = sseBuffer.split("\n");
+        sseBuffer = lines.pop() || "";
+
+        for (const line of lines) {
+            if (!line.startsWith("data: ")) continue;
+            const data = line.slice(6).trim();
+            if (!data || data === "[DONE]") continue;
+            try {
+                const event = JSON.parse(data) as Record<string, unknown>;
+                if (event.type === "token" && typeof event.token === "string") {
+                    streamAnswer += event.token;
+                }
+                if (event.type === "done") {
+                    gotDoneEvent = true;
+                    if (typeof event.answer === "string") streamAnswer = event.answer;
+                    if (Array.isArray(event.sources)) streamSources = event.sources as string[];
+                    if (Array.isArray(event.matches)) streamMatches = event.matches as unknown[];
+                }
+            } catch {
+                // Ignore parse errors for individual events
+            }
+        }
+    }
+
+    async function persistStreamResult() {
+        if (!gotDoneEvent || !streamAnswer.trim()) return;
+        const sessionId = parsedRequest!.session_id;
+        const userId = user!.id;
+        try {
+            const inserted = await saveChatMessage({
+                conversationId: sessionId,
+                userId,
+                role: "assistant",
+                content: streamAnswer,
+                markdownContent: streamAnswer,
+                citations: streamSources.length > 0 ? streamSources : undefined,
+                matches: streamMatches.length > 0 ? streamMatches : undefined,
+                generationId,
+            });
+            await markChatGenerationCompleted({
+                generationId,
+                userId,
+                assistantMessageId: inserted.id,
+            });
+            console.info("[chat/route] Stream result persisted for generation=%s", generationId);
+        } catch (err) {
+            // If duplicate key (already persisted), that's fine
+            const message = err instanceof Error ? err.message : String(err);
+            if (!/duplicate key/i.test(message)) {
+                console.error("[chat/route] Failed to persist stream result:", message);
+            }
+        }
+    }
+
+    const stream = new ReadableStream({
+        async start(controller) {
+            controller.enqueue(encoder.encode(metaEvent));
+        },
+        async pull(controller) {
+            try {
+                const { done, value } = await upstreamReader.read();
+                if (done) {
+                    // Stream complete — persist result in background
+                    persistStreamResult().catch(() => { });
+                    controller.close();
+                    return;
+                }
+                // Forward to client immediately
+                controller.enqueue(value);
+                // Also parse for Supabase persistence
+                parseSSEChunk(value);
+            } catch (error) {
+                console.error("[chat/route] SSE proxy read error:", error);
+                controller.close();
+            }
+        },
+        cancel() {
+            upstreamReader.cancel().catch(() => { });
+        },
+    });
+
+    return new Response(stream, {
+        status: 200,
+        headers: quotaHeaders,
+    });
+}
+
+// ── Fallback to polling architecture ──
+
+async function fallbackToPolling(
+    backendPayload: Record<string, unknown>,
+    generationId: string,
+    userId: string,
+    quota: QuotaResult
+): Promise<NextResponse> {
     let upstream: Response;
     try {
         upstream = await fetch(buildBackendUrl("/chat"), {
             method: "POST",
             headers: buildBackendHeaders({ "Content-Type": "application/json" }),
-            body: JSON.stringify({
-                ...parsedRequest,
-                active_index_names: activeIndexes.length > 0 ? activeIndexes : undefined,
-            }),
+            body: JSON.stringify(backendPayload),
             cache: "no-store",
         });
     } catch {
+        await markChatGenerationFailed({
+            generationId,
+            userId,
+            errorMessage: "Backend is unavailable.",
+        }).catch(() => undefined);
         return errorResponse("Backend is unavailable.", 502, quota);
     }
 
@@ -285,6 +401,11 @@ export async function POST(request: NextRequest) {
                 ? "Backend failed to process request."
                 : "Request was rejected by backend.";
         const message = extractUpstreamErrorMessage(payload, fallback);
+        await markChatGenerationFailed({
+            generationId,
+            userId,
+            errorMessage: message,
+        }).catch(() => undefined);
         return errorResponse(
             message,
             upstream.status >= 500 ? 502 : upstream.status,
@@ -292,35 +413,52 @@ export async function POST(request: NextRequest) {
         );
     }
 
-    if (payload === null || typeof payload === "string") {
+    if (!payload || typeof payload !== "object" || !("task_id" in payload)) {
+        await markChatGenerationFailed({
+            generationId,
+            userId,
+            errorMessage: "Unexpected backend response format.",
+        }).catch(() => undefined);
         return errorResponse("Unexpected backend response format.", 502, quota);
     }
-
-    const sanitized = sanitizeEvidence(payload as Record<string, unknown>);
-    if (!sanitized) {
-        return errorResponse("Backend response is missing answer.", 502, quota);
+    const taskId = (payload as Record<string, unknown>).task_id;
+    if (typeof taskId !== "string" && typeof taskId !== "number") {
+        await markChatGenerationFailed({
+            generationId,
+            userId,
+            errorMessage: "Backend response is missing task id.",
+        }).catch(() => undefined);
+        return errorResponse("Backend response is missing task id.", 502, quota);
     }
 
     try {
-        await saveChatMessage({
-            conversationId: parsedRequest.session_id,
-            userId: user.id,
-            role: "assistant",
-            content: sanitized.answer,
-            markdownContent: sanitized.answer,
-            citations: sanitized.sources,
+        await setChatGenerationTaskId({
+            generationId,
+            userId,
+            taskId: String(taskId),
         });
     } catch (error) {
         const message =
             error instanceof Error
                 ? error.message
-                : "Failed to persist assistant response.";
+                : "Failed to store chat task id.";
+        await markChatGenerationFailed({
+            generationId,
+            userId,
+            errorMessage: message,
+        }).catch(() => undefined);
         return errorResponse(message, 500, quota);
     }
 
+    startChatGenerationMonitor({
+        generationId,
+        userId,
+    });
+
     const response = NextResponse.json(
         {
-            ...sanitized,
+            status: "processing",
+            generation_id: generationId,
             quota: {
                 limit: quota.limit,
                 used: quota.used,

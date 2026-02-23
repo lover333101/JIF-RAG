@@ -95,13 +95,14 @@ export default function AccountPage() {
                         alignItems: "center",
                         justifyContent: "space-between",
                         gap: "var(--space-3)",
+                        flexWrap: "wrap",
                     }}
                 >
                     <div>
                         <h1
                             style={{
                                 fontFamily: "var(--font-serif)",
-                                fontSize: "clamp(30px, 4vw, 44px)",
+                                fontSize: "clamp(26px, 4vw, 44px)",
                                 fontWeight: 400,
                                 letterSpacing: "-0.02em",
                                 marginBottom: "var(--space-1)",

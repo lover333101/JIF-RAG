@@ -176,10 +176,10 @@ function decorateMarkdown(
     node: ReactNode,
     activeHighlight:
         | {
-              snippet: string;
-              markId: string;
-              markClassName: string;
-          }
+            snippet: string;
+            markId: string;
+            markClassName: string;
+        }
         | null
 ): ReactNode {
     if (!activeHighlight) {
@@ -196,34 +196,444 @@ function decorateMarkdown(
     );
 }
 
-function TypingIndicator() {
+const ChevronIcon = ({ expanded }: { expanded: boolean }) => (
+    <motion.svg
+        animate={{ rotate: expanded ? 180 : 0 }}
+        transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+        width="14"
+        height="14"
+        viewBox="0 0 16 16"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+    >
+        <polyline points="4 6 8 10 12 6" />
+    </motion.svg>
+);
+
+const CheckIcon = () => (
+    <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+        <polyline points="3 8.5 6.5 12 13 4" />
+    </svg>
+);
+
+const SpinnerIcon = () => (
+    <svg width="10" height="10" viewBox="0 0 16 16" fill="none" style={{ animation: "spin 0.8s linear infinite" }}>
+        <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="2" strokeDasharray="28" strokeDashoffset="8" strokeLinecap="round" />
+    </svg>
+);
+
+function ThinkingTrace({
+    thinkingStatus,
+    thinkingSteps,
+}: {
+    thinkingStatus?: string;
+    thinkingSteps?: ChatMessage["thinkingSteps"];
+}) {
+    const steps = thinkingSteps ?? [];
+    if (!thinkingStatus && steps.length === 0) {
+        return null;
+    }
+
+    const completedCount = steps.filter((s) => s.state === "done").length;
+    const totalCount = steps.length;
+    const progressPercent = totalCount > 0 ? (completedCount / totalCount) * 100 : 0;
+
+    return (
+        <motion.div
+            initial={{ opacity: 0, y: 8, scale: 0.97 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+            className="thinking-trace-card"
+            style={{
+                marginTop: "var(--space-3)",
+                borderRadius: "var(--radius-lg)",
+                overflow: "hidden",
+                border: "1px solid color-mix(in oklch, var(--color-warning) 25%, var(--border-default))",
+                background: "linear-gradient(135deg, rgba(247,245,240,.97), rgba(255,255,255,.92))",
+                backdropFilter: "blur(8px)",
+                boxShadow: "0 2px 12px rgba(212, 168, 67, 0.08), 0 1px 3px rgba(0,0,0,0.04)",
+            }}
+        >
+            {/* Shimmer progress bar */}
+            <div style={{ height: 2, background: "var(--border-subtle)", position: "relative", overflow: "hidden" }}>
+                <motion.div
+                    animate={{ width: `${progressPercent}%` }}
+                    transition={{ duration: 0.5, ease: "easeOut" }}
+                    className="thinking-shimmer-bar"
+                    style={{
+                        position: "absolute",
+                        top: 0,
+                        left: 0,
+                        height: "100%",
+                        background: "linear-gradient(90deg, var(--color-warning), var(--color-accent))",
+                        borderRadius: "0 2px 2px 0",
+                    }}
+                />
+            </div>
+
+            <div style={{ padding: "var(--space-3) var(--space-4)" }}>
+                {/* Header */}
+                {thinkingStatus && (
+                    <div
+                        style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "var(--space-2)",
+                            marginBottom: steps.length > 0 ? "var(--space-3)" : 0,
+                        }}
+                    >
+                        <div style={{
+                            width: 18,
+                            height: 18,
+                            borderRadius: "var(--radius-sm)",
+                            background: "linear-gradient(135deg, rgba(212,168,67,0.15), rgba(196,122,74,0.1))",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            flexShrink: 0,
+                        }}>
+                            <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="var(--color-warning)" strokeWidth="1.5" strokeLinecap="round">
+                                <circle cx="8" cy="8" r="3" />
+                                <path d="M8 1v2M8 13v2M1 8h2M13 8h2M3.05 3.05l1.41 1.41M11.54 11.54l1.41 1.41M3.05 12.95l1.41-1.41M11.54 4.46l1.41-1.41" />
+                            </svg>
+                        </div>
+                        <span
+                            style={{
+                                fontSize: "var(--text-xs)",
+                                fontWeight: 600,
+                                color: "var(--text-primary)",
+                                letterSpacing: "0.01em",
+                            }}
+                        >
+                            {thinkingStatus}
+                        </span>
+                        {totalCount > 0 && (
+                            <span
+                                style={{
+                                    marginLeft: "auto",
+                                    fontSize: "11px",
+                                    color: "var(--text-tertiary)",
+                                    fontFamily: "var(--font-mono)",
+                                    fontWeight: 500,
+                                }}
+                            >
+                                {completedCount}/{totalCount}
+                            </span>
+                        )}
+                    </div>
+                )}
+
+                {/* Timeline steps */}
+                {steps.length > 0 && (
+                    <div style={{ display: "grid", gap: 0, position: "relative" }}>
+                        {steps.map((step, idx) => {
+                            const isActive = step.state === "active";
+                            const isDone = step.state === "done";
+                            const isLast = idx === steps.length - 1;
+
+                            return (
+                                <div
+                                    key={step.id}
+                                    style={{
+                                        display: "flex",
+                                        gap: "var(--space-3)",
+                                        position: "relative",
+                                        paddingBottom: isLast ? 0 : "var(--space-3)",
+                                    }}
+                                >
+                                    {/* Timeline spine */}
+                                    <div
+                                        style={{
+                                            display: "flex",
+                                            flexDirection: "column",
+                                            alignItems: "center",
+                                            flexShrink: 0,
+                                            width: 20,
+                                            paddingTop: 2,
+                                        }}
+                                    >
+                                        {/* Step node */}
+                                        <motion.div
+                                            animate={
+                                                isActive
+                                                    ? {
+                                                        boxShadow: [
+                                                            "0 0 0 0 rgba(212,168,67,0.3)",
+                                                            "0 0 0 5px rgba(212,168,67,0)",
+                                                            "0 0 0 0 rgba(212,168,67,0.3)",
+                                                        ],
+                                                    }
+                                                    : { boxShadow: "0 0 0 0 transparent" }
+                                            }
+                                            transition={
+                                                isActive
+                                                    ? {
+                                                        duration: 1.5,
+                                                        repeat: Infinity,
+                                                        ease: "easeInOut",
+                                                    }
+                                                    : undefined
+                                            }
+                                            style={{
+                                                width: 20,
+                                                height: 20,
+                                                borderRadius: "50%",
+                                                display: "flex",
+                                                alignItems: "center",
+                                                justifyContent: "center",
+                                                flexShrink: 0,
+                                                border: isDone
+                                                    ? "2px solid var(--color-success)"
+                                                    : isActive
+                                                        ? "2px solid var(--color-warning)"
+                                                        : "2px solid var(--border-default)",
+                                                background: isDone
+                                                    ? "rgba(74, 158, 111, 0.1)"
+                                                    : isActive
+                                                        ? "rgba(212, 168, 67, 0.1)"
+                                                        : "var(--bg-tertiary)",
+                                                color: isDone
+                                                    ? "var(--color-success)"
+                                                    : isActive
+                                                        ? "var(--color-warning)"
+                                                        : "var(--text-tertiary)",
+                                                transition: "all 0.3s ease",
+                                            }}
+                                        >
+                                            {isDone ? <CheckIcon /> : isActive ? <SpinnerIcon /> : (
+                                                <div style={{ width: 4, height: 4, borderRadius: "50%", background: "var(--border-default)" }} />
+                                            )}
+                                        </motion.div>
+
+                                        {/* Connecting line */}
+                                        {!isLast && (
+                                            <div
+                                                style={{
+                                                    flex: 1,
+                                                    width: 2,
+                                                    marginTop: 2,
+                                                    borderRadius: 1,
+                                                    background: isDone
+                                                        ? "var(--color-success)"
+                                                        : "var(--border-default)",
+                                                    opacity: isDone ? 0.4 : 0.3,
+                                                    transition: "all 0.3s ease",
+                                                }}
+                                            />
+                                        )}
+                                    </div>
+
+                                    {/* Step content */}
+                                    <div style={{ minWidth: 0, paddingTop: 1 }}>
+                                        <div
+                                            style={{
+                                                fontSize: "var(--text-xs)",
+                                                color: isActive
+                                                    ? "var(--text-primary)"
+                                                    : isDone
+                                                        ? "var(--text-secondary)"
+                                                        : "var(--text-tertiary)",
+                                                fontWeight: isActive ? 600 : 500,
+                                                lineHeight: 1.4,
+                                                transition: "color 0.2s ease",
+                                            }}
+                                        >
+                                            {step.label}
+                                        </div>
+                                        {step.detail && (
+                                            <div
+                                                style={{
+                                                    fontSize: "11px",
+                                                    color: "var(--text-tertiary)",
+                                                    lineHeight: 1.4,
+                                                    marginTop: 2,
+                                                }}
+                                            >
+                                                {step.detail}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                )}
+            </div>
+        </motion.div>
+    );
+}
+
+function TypingIndicator({
+    responseMode,
+    thinkingStatus,
+    thinkingSteps,
+}: {
+    responseMode?: ChatMessage["responseMode"];
+    thinkingStatus?: string;
+    thinkingSteps?: ChatMessage["thinkingSteps"];
+}) {
+    const isHeavy = responseMode === "heavy";
+    const [showThinking, setShowThinking] = useState(isHeavy);
+    const canShowThinking =
+        isHeavy &&
+        (Boolean(thinkingStatus) ||
+            Boolean(thinkingSteps && thinkingSteps.length > 0));
+
     return (
         <div
             style={{
-                display: "inline-flex",
-                alignItems: "center",
+                display: "grid",
                 gap: "var(--space-2)",
                 color: "var(--text-secondary)",
             }}
         >
-            <span style={{ fontSize: "var(--text-sm)", fontWeight: 500 }}>
-                Jiff is typing
-            </span>
-            <span className="typing-dots">
-                {[0, 1, 2].map((index) => (
-                    <motion.span
-                        key={index}
-                        className="typing-dot"
-                        animate={{ y: [0, -3, 0], opacity: [0.35, 1, 0.35] }}
+            {/* Typing / Thinking header */}
+            <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
+                {/* Glowing orb */}
+                <div style={{ position: "relative", width: 28, height: 28, flexShrink: 0 }}>
+                    <motion.div
+                        animate={{
+                            scale: [1, 1.35, 1],
+                            opacity: [0.25, 0.5, 0.25],
+                        }}
                         transition={{
-                            duration: 0.7,
+                            duration: isHeavy ? 2 : 1.4,
                             repeat: Infinity,
-                            delay: index * 0.12,
                             ease: "easeInOut",
                         }}
+                        style={{
+                            position: "absolute",
+                            inset: 0,
+                            borderRadius: "50%",
+                            background: isHeavy
+                                ? "radial-gradient(circle, var(--color-warning), transparent 70%)"
+                                : "radial-gradient(circle, var(--color-accent), transparent 70%)",
+                        }}
                     />
-                ))}
-            </span>
+                    <motion.div
+                        animate={
+                            isHeavy
+                                ? { scale: [0.9, 1.1, 0.9] }
+                                : { scale: [0.95, 1.05, 0.95] }
+                        }
+                        transition={{
+                            duration: isHeavy ? 1.6 : 1,
+                            repeat: Infinity,
+                            ease: "easeInOut",
+                        }}
+                        style={{
+                            position: "absolute",
+                            inset: 6,
+                            borderRadius: "50%",
+                            background: isHeavy
+                                ? "linear-gradient(135deg, var(--color-warning), var(--color-accent))"
+                                : "var(--color-accent)",
+                            boxShadow: isHeavy
+                                ? "0 0 12px rgba(212, 168, 67, 0.4)"
+                                : "0 0 8px rgba(196, 122, 74, 0.3)",
+                        }}
+                    />
+                </div>
+
+                <div style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
+                        <span
+                            style={{
+                                fontSize: "var(--text-sm)",
+                                fontWeight: 600,
+                                color: isHeavy ? "var(--color-warning)" : "var(--text-secondary)",
+                                letterSpacing: "0.01em",
+                            }}
+                        >
+                            {isHeavy ? "Jiff is thinking" : "Jiff is typing"}
+                        </span>
+                        <span className="typing-dots">
+                            {[0, 1, 2].map((index) => (
+                                <motion.span
+                                    key={index}
+                                    className="typing-dot"
+                                    animate={
+                                        isHeavy
+                                            ? { scale: [0.85, 1.25, 0.85], opacity: [0.35, 1, 0.35] }
+                                            : { y: [0, -3, 0], opacity: [0.35, 1, 0.35] }
+                                    }
+                                    transition={{
+                                        duration: isHeavy ? 0.85 : 0.7,
+                                        repeat: Infinity,
+                                        delay: index * 0.12,
+                                        ease: "easeInOut",
+                                    }}
+                                    style={{
+                                        background: isHeavy
+                                            ? "var(--color-warning)"
+                                            : "var(--color-accent)",
+                                    }}
+                                />
+                            ))}
+                        </span>
+                    </div>
+                    {isHeavy && (
+                        <span
+                            style={{
+                                fontSize: "11px",
+                                color: "var(--text-tertiary)",
+                                lineHeight: 1.3,
+                            }}
+                        >
+                            Analyzing evidence and reasoning deeply
+                        </span>
+                    )}
+                </div>
+            </div>
+
+            {/* Expandable thinking trace */}
+            {canShowThinking && (
+                <div style={{ display: "grid", gap: 0 }}>
+                    <button
+                        type="button"
+                        onClick={() => setShowThinking((prev) => !prev)}
+                        style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "var(--space-1)",
+                            width: "fit-content",
+                            fontSize: "var(--text-xs)",
+                            fontWeight: 500,
+                            color: "var(--text-tertiary)",
+                            background: showThinking
+                                ? "rgba(212, 168, 67, 0.08)"
+                                : "transparent",
+                            border: "none",
+                            padding: "var(--space-1) var(--space-2)",
+                            borderRadius: "var(--radius-sm)",
+                            cursor: "pointer",
+                            transition: "all 0.2s ease",
+                        }}
+                        onMouseEnter={(e) => {
+                            e.currentTarget.style.color = "var(--text-secondary)";
+                            e.currentTarget.style.background = "rgba(212, 168, 67, 0.12)";
+                        }}
+                        onMouseLeave={(e) => {
+                            e.currentTarget.style.color = "var(--text-tertiary)";
+                            e.currentTarget.style.background = showThinking
+                                ? "rgba(212, 168, 67, 0.08)"
+                                : "transparent";
+                        }}
+                    >
+                        <ChevronIcon expanded={showThinking} />
+                        <span>{showThinking ? "Hide progress" : "Show progress"}</span>
+                    </button>
+                    {showThinking && (
+                        <ThinkingTrace
+                            thinkingStatus={thinkingStatus}
+                            thinkingSteps={thinkingSteps}
+                        />
+                    )}
+                </div>
+            )}
         </div>
     );
 }
@@ -270,12 +680,40 @@ export default function ChatBubble({ message }: ChatBubbleProps) {
     const { state, dispatch } = useApp();
     const isUser = message.role === "user";
     const [copied, setCopied] = useState(false);
+    const [showThinkingModel, setShowThinkingModel] = useState(false);
 
     const evidenceStrength = message.matches
         ? assessEvidenceStrength(message.matches, message.content)
         : undefined;
     const isWeakEvidence = evidenceStrength === "weak" || evidenceStrength === "none";
     const hasMatches = Boolean(message.matches && message.matches.length > 0);
+    const hasCitations = Boolean(message.citations && message.citations.length > 0);
+    const hasMentionedSources = Boolean(
+        message.citationMentions && message.citationMentions.length > 0
+    );
+    const hasEvidence = hasMatches || hasCitations || hasMentionedSources;
+    const sourceCount = hasMatches
+        ? message.matches?.length ?? 0
+        : hasCitations
+            ? new Set(
+                (message.citations ?? [])
+                    .map((source) => source.trim())
+                    .filter(Boolean)
+            ).size
+            : new Set(
+                (message.citationMentions ?? [])
+                    .map((mention) => mention.source.trim())
+                    .filter(Boolean)
+            ).size;
+    const sourceLabel = sourceCount === 1 ? "source" : "sources";
+    const canViewThinkingModel = Boolean(
+        !isUser &&
+        !message.isLoading &&
+        !message.isError &&
+        ((message.thinkingSteps && message.thinkingSteps.length > 0) ||
+            message.thinkingStatus ||
+            message.routingReason)
+    );
 
     const activeHighlight = useMemo(() => {
         if (!message.citationMentions || message.citationMentions.length === 0) {
@@ -292,8 +730,8 @@ export default function ChatBubble({ message }: ChatBubbleProps) {
         const index = hoverApplies
             ? state.hoveredCitationIndex
             : activeApplies
-              ? state.activeCitationIndex
-              : null;
+                ? state.activeCitationIndex
+                : null;
 
         if (index === null) return null;
         const mention = message.citationMentions[index];
@@ -336,7 +774,7 @@ export default function ChatBubble({ message }: ChatBubbleProps) {
                 marginBottom: "var(--space-4)",
             }}
         >
-            <div style={{ maxWidth: isUser ? "65%" : "80%", width: "100%" }}>
+            <div style={{ maxWidth: isUser ? "clamp(65%, 70vw, 85%)" : "clamp(80%, 90vw, 95%)", width: "100%" }}>
                 <div
                     style={{
                         fontSize: "var(--text-xs)",
@@ -365,17 +803,21 @@ export default function ChatBubble({ message }: ChatBubbleProps) {
                         borderColor: activeHighlight
                             ? "var(--color-accent)"
                             : isUser
-                              ? "transparent"
-                              : "var(--border-subtle)",
+                                ? "transparent"
+                                : "var(--border-subtle)",
                         boxShadow: activeHighlight
                             ? "0 0 0 3px rgba(196, 122, 74, 0.14)"
                             : isUser
-                              ? "none"
-                              : "var(--shadow-sm)",
+                                ? "none"
+                                : "var(--shadow-sm)",
                     }}
                 >
                     {message.isLoading ? (
-                        <TypingIndicator />
+                        <TypingIndicator
+                            responseMode={message.responseMode}
+                            thinkingStatus={message.thinkingStatus}
+                            thinkingSteps={message.thinkingSteps}
+                        />
                     ) : message.isError ? (
                         <div
                             style={{
@@ -521,7 +963,7 @@ export default function ChatBubble({ message }: ChatBubbleProps) {
                                 </div>
                             )}
 
-                            {hasMatches && (
+                            {hasEvidence && (
                                 <button
                                     onClick={() =>
                                         dispatch({
@@ -553,7 +995,50 @@ export default function ChatBubble({ message }: ChatBubbleProps) {
                                     }}
                                 >
                                     <SourceIcon />
-                                    {message.matches?.length ?? 0} sources
+                                    {sourceCount} {sourceLabel}
+                                </button>
+                            )}
+
+                            {canViewThinkingModel && (
+                                <button
+                                    onClick={() => setShowThinkingModel((prev) => !prev)}
+                                    id={`btn-thinking-${message.id}`}
+                                    style={{
+                                        display: "inline-flex",
+                                        alignItems: "center",
+                                        gap: "var(--space-1)",
+                                        fontSize: "var(--text-xs)",
+                                        color: showThinkingModel
+                                            ? "var(--text-secondary)"
+                                            : "var(--text-tertiary)",
+                                        fontWeight: 500,
+                                        background: showThinkingModel
+                                            ? "rgba(212, 168, 67, 0.08)"
+                                            : "none",
+                                        border: "none",
+                                        cursor: "pointer",
+                                        padding: "var(--space-1) var(--space-2)",
+                                        borderRadius: "var(--radius-sm)",
+                                        transition: "all var(--duration-fast) var(--ease-out)",
+                                    }}
+                                    onMouseEnter={(e) => {
+                                        e.currentTarget.style.background =
+                                            "rgba(212, 168, 67, 0.12)";
+                                        e.currentTarget.style.color = "var(--text-secondary)";
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        e.currentTarget.style.background = showThinkingModel
+                                            ? "rgba(212, 168, 67, 0.08)"
+                                            : "none";
+                                        e.currentTarget.style.color = showThinkingModel
+                                            ? "var(--text-secondary)"
+                                            : "var(--text-tertiary)";
+                                    }}
+                                >
+                                    <ChevronIcon expanded={showThinkingModel} />
+                                    {showThinkingModel
+                                        ? "Hide reasoning"
+                                        : "View reasoning"}
                                 </button>
                             )}
                         </div>
@@ -591,8 +1076,14 @@ export default function ChatBubble({ message }: ChatBubbleProps) {
                         </button>
                     </div>
                 )}
+
+                {canViewThinkingModel && showThinkingModel && (
+                    <ThinkingTrace
+                        thinkingStatus={message.thinkingStatus}
+                        thinkingSteps={message.thinkingSteps}
+                    />
+                )}
             </div>
         </motion.div>
     );
 }
-

@@ -42,7 +42,7 @@ const ExpandIcon = ({ open }: { open: boolean }) => (
 function normalizeSourceLabelKey(value: string): string {
     return value
         .normalize("NFKC")
-        .replace(/[‐-―]/g, "-")
+        .replace(/[\u2010-\u2015]/g, "-")
         .replace(/\s+/g, " ")
         .trim()
         .toLowerCase();
@@ -54,8 +54,8 @@ function ScoreBar({ score }: { score: number }) {
         score >= 0.8
             ? "var(--color-success)"
             : score >= 0.5
-              ? "var(--color-warning)"
-              : "var(--color-danger)";
+                ? "var(--color-warning)"
+                : "var(--color-danger)";
 
     return (
         <div
@@ -222,20 +222,22 @@ function SourceCard({
                     >
                         {sourceScore
                             ? `Score ${sourceScore}% - ${group.mentions.length} used`
-                            : `${group.mentions.length} used - cited in answer`}
+                            : group.mentions.length > 0
+                                ? `${group.mentions.length} used - cited in answer`
+                                : "Cited in answer"}
                     </div>
                     {group.match ? <ScoreBar score={group.match.score} /> : null}
                 </div>
-                    <span
-                        style={{
-                            fontSize: "var(--text-xs)",
-                            color: "var(--text-tertiary)",
-                            fontFamily: "var(--font-mono)",
-                        }}
-                    >
-                        {alias}
-                    </span>
-                </button>
+                <span
+                    style={{
+                        fontSize: "var(--text-xs)",
+                        color: "var(--text-tertiary)",
+                        fontFamily: "var(--font-mono)",
+                    }}
+                >
+                    {alias}
+                </span>
+            </button>
 
             {isOpen ? (
                 <div
@@ -264,7 +266,9 @@ function SourceCard({
                                 color: "var(--text-tertiary)",
                             }}
                         >
-                            This source is retrieved but not explicitly cited in this answer.
+                            {group.match
+                                ? "This source is retrieved but not explicitly cited in this answer."
+                                : "This source is cited, but no snippet was extracted for highlighting."}
                         </div>
                     ) : (
                         group.mentions.map(({ mention, index: mentionIndex }) => {
@@ -355,6 +359,10 @@ export default function EvidenceDrawer() {
         () => selectedMessage?.citationMentions ?? [],
         [selectedMessage?.citationMentions]
     );
+    const citations = useMemo(
+        () => selectedMessage?.citations ?? [],
+        [selectedMessage?.citations]
+    );
 
     const sourceGroups = useMemo(() => {
         const groups = new Map<string, SourceGroup>();
@@ -383,6 +391,18 @@ export default function EvidenceDrawer() {
             });
         });
 
+        citations.forEach((citation) => {
+            const source = citation.trim();
+            if (!source) return;
+            const key = normalizeSourceLabelKey(source);
+            if (groups.has(key)) return;
+            groups.set(key, {
+                key,
+                source,
+                mentions: [],
+            });
+        });
+
         return [...groups.values()].sort((a, b) => {
             const aHasMatch = Boolean(a.match);
             const bHasMatch = Boolean(b.match);
@@ -393,7 +413,7 @@ export default function EvidenceDrawer() {
             const bScore = b.match?.score ?? -1;
             return bScore - aScore;
         });
-    }, [matches, citationMentions]);
+    }, [matches, citationMentions, citations]);
 
     const setHovered = (index: number | null) => {
         dispatch({
@@ -438,7 +458,7 @@ export default function EvidenceDrawer() {
             style={{
                 width: "var(--drawer-width)",
                 minWidth: "var(--drawer-width)",
-                height: "100vh",
+                height: "100dvh",
                 background: "var(--bg-drawer)",
                 borderLeft: evidenceDrawerOpen
                     ? "1px solid var(--border-default)"

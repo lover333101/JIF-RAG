@@ -31,6 +31,8 @@ create table if not exists public.messages (
     content text not null,
     markdown_content text not null,
     citations jsonb not null default '[]'::jsonb,
+    matches jsonb not null default '[]'::jsonb,
+    generation_id uuid,
     created_at timestamptz not null default now()
 );
 create index if not exists messages_conversation_created_idx
@@ -76,9 +78,54 @@ create table if not exists public.access_requests (
     updated_at timestamptz not null default now()
 );
 
+create table if not exists public.chat_generations (
+    id uuid primary key default gen_random_uuid(),
+    conversation_id uuid not null references public.conversations (id) on delete cascade,
+    user_id uuid not null references auth.users (id) on delete cascade,
+    task_id text,
+    status text not null default 'processing',
+    error_message text,
+    assistant_message_id uuid references public.messages (id) on delete set null,
+    created_at timestamptz not null default now(),
+    updated_at timestamptz not null default now(),
+    completed_at timestamptz,
+    expires_at timestamptz not null default (now() + interval '20 minutes')
+);
+alter table public.chat_generations
+    drop constraint if exists chat_generations_status_check;
+alter table public.chat_generations
+    add constraint chat_generations_status_check
+    check (status in ('processing', 'completed', 'failed', 'expired'));
+create index if not exists chat_generations_user_status_updated_idx
+    on public.chat_generations (user_id, status, updated_at desc);
+create index if not exists chat_generations_conversation_status_updated_idx
+    on public.chat_generations (conversation_id, status, updated_at desc);
+create index if not exists chat_generations_task_id_idx
+    on public.chat_generations (task_id)
+    where task_id is not null;
+
+alter table public.messages
+    drop constraint if exists messages_matches_is_array_check;
+alter table public.messages
+    add constraint messages_matches_is_array_check
+    check (jsonb_typeof(matches) = 'array');
+alter table public.messages
+    drop constraint if exists messages_generation_id_fkey;
+alter table public.messages
+    add constraint messages_generation_id_fkey
+    foreign key (generation_id)
+    references public.chat_generations (id)
+    on delete set null;
+create index if not exists messages_generation_id_idx
+    on public.messages (generation_id);
+create unique index if not exists messages_assistant_generation_unique_idx
+    on public.messages (generation_id)
+    where generation_id is not null and role = 'assistant';
+
 alter table public.profiles enable row level security;
 alter table public.conversations enable row level security;
 alter table public.messages enable row level security;
+alter table public.chat_generations enable row level security;
 alter table public.user_settings enable row level security;
 alter table public.user_limits enable row level security;
 alter table public.daily_usage enable row level security;
@@ -101,6 +148,13 @@ with check (auth.uid() = user_id);
 drop policy if exists messages_own_rows on public.messages;
 create policy messages_own_rows
 on public.messages
+for all
+using (auth.uid() = user_id)
+with check (auth.uid() = user_id);
+
+drop policy if exists chat_generations_own_rows on public.chat_generations;
+create policy chat_generations_own_rows
+on public.chat_generations
 for all
 using (auth.uid() = user_id)
 with check (auth.uid() = user_id);

@@ -49,7 +49,7 @@ export async function GET(_request: Request, { params }: Params) {
 
     const { data, error } = await admin
         .from("messages")
-        .select("id,conversation_id,role,content,markdown_content,citations,created_at")
+        .select("id,conversation_id,role,content,markdown_content,citations,matches,created_at")
         .eq("user_id", user.id)
         .eq("conversation_id", conversationId)
         .order("created_at", { ascending: true });
