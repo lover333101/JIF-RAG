@@ -20,12 +20,18 @@ import {
     readUpstreamPayload,
 } from "@/lib/server/backend";
 import { consumeDailyQuota, type QuotaResult } from "@/lib/server/quota";
+import { normalizeCitations, normalizeMatches } from "@/lib/normalize";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const ENABLE_CHAT_STREAM_PROXY =
     process.env.ENABLE_CHAT_STREAM_PROXY?.trim().toLowerCase() === "true";
+const SOURCE_ALIAS_REGEX = /^source\s*#\s*\d{1,3}$/i;
+
+function isPublicSourceLabel(value: unknown): value is string {
+    return typeof value === "string" && SOURCE_ALIAS_REGEX.test(value.trim());
+}
 
 interface ChatProxyRequest {
     question: string;
@@ -317,6 +323,16 @@ export async function POST(request: NextRequest) {
         if (!gotDoneEvent || !streamAnswer.trim()) return;
         const sessionId = parsedRequest!.session_id;
         const userId = user!.id;
+        const safeSources = (normalizeCitations(streamSources) ?? []).filter(
+            (source) => isPublicSourceLabel(source)
+        );
+        const safeMatches = (normalizeMatches(streamMatches) ?? [])
+            .filter((match) => isPublicSourceLabel(match.source))
+            .map((match) => ({
+                id: match.id,
+                score: match.score,
+                source: match.source,
+            }));
         try {
             const inserted = await saveChatMessage({
                 conversationId: sessionId,
@@ -324,8 +340,8 @@ export async function POST(request: NextRequest) {
                 role: "assistant",
                 content: streamAnswer,
                 markdownContent: streamAnswer,
-                citations: streamSources.length > 0 ? streamSources : undefined,
-                matches: streamMatches.length > 0 ? streamMatches : undefined,
+                citations: safeSources.length > 0 ? safeSources : undefined,
+                matches: safeMatches.length > 0 ? safeMatches : undefined,
                 generationId,
             });
             await markChatGenerationCompleted({

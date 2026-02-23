@@ -13,6 +13,7 @@ export const RELIABILITY_TAG_REGEX =
     /\[(KB|Inference|Suggested baseline \(inference\))\]/g;
 export const RELIABILITY_CAPTURE_REGEX =
     /\[(KB|Inference|Suggested baseline \(inference\))\]/g;
+export const SOURCE_ALIAS_REGEX = /^source\s*#\s*\d{1,3}$/i;
 
 // ── Utility functions ────────────────────────────────────────────────
 
@@ -32,6 +33,12 @@ export function normalizeSourceLabelKey(value: string): string {
         .replace(/\s+/g, " ")
         .trim()
         .toLowerCase();
+}
+
+function toCanonicalSourceAlias(value: string): string {
+    const match = value.trim().match(/^source\s*#\s*(\d{1,3})$/i);
+    if (!match) return "";
+    return `Source #${match[1].padStart(2, "0")}`;
 }
 
 export function stripMarkdownDecorators(text: string): string {
@@ -66,8 +73,11 @@ export function stripStoredTokens(text: string): string {
             .replace(BRACKET_TOKEN_REGEX, (full, tokenValue: string) => {
                 const token = tokenValue.trim();
                 if (NON_SOURCE_TAGS.has(token)) return "";
-                if (/^source\s*#/i.test(token)) return "";
+                const normalized = normalizeCitationToken(token);
+                if (SOURCE_ALIAS_REGEX.test(normalized)) return "";
                 if (/^source\s*=/i.test(token)) return "";
+                if (normalized.includes("/") || normalized.includes("\\")) return "";
+                if (/\.[a-z0-9]{2,8}(\b|$)/i.test(normalized)) return "";
                 return full;
             })
             .replace(RELIABILITY_TAG_REGEX, "")
@@ -252,17 +262,24 @@ export function parseAnswerArtifacts(
 
         const tokenKey = normalizeSourceLabelKey(normalizedToken);
         const canonical = canonicalSourceMap.get(tokenKey);
-        const looksLikeSourceLabel =
-            Boolean(canonical) ||
+        const looksLikeFileSource =
             normalizedToken.includes("/") ||
             normalizedToken.includes("\\") ||
-            /\.md(\b|$)/i.test(normalizedToken) ||
+            /\.[a-z0-9]{2,8}(\b|$)/i.test(normalizedToken) ||
             tokenValue.trim().toLowerCase().startsWith("source=");
+        const aliasToken = SOURCE_ALIAS_REGEX.test(normalizedToken);
 
-        if (!looksLikeSourceLabel) {
+        if (!canonical && !aliasToken) {
+            if (looksLikeFileSource) {
+                return "";
+            }
             return full;
         }
-        const sourceLabel = canonical ?? normalizedToken;
+
+        const sourceLabel = canonical ?? toCanonicalSourceAlias(normalizedToken);
+        if (!sourceLabel) {
+            return "";
+        }
 
         if (!citationSeen.has(sourceLabel)) {
             citations.push(sourceLabel);

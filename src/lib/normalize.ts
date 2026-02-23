@@ -1,7 +1,12 @@
 import type { MatchItem, ThinkingStep } from "@/types/chat";
 
-// ── Match normalization ──────────────────────────────────────────────
+const SOURCE_ALIAS_REGEX = /^source\s*#\s*\d{1,3}$/i;
 
+function isPublicSourceLabel(value: string): boolean {
+    return SOURCE_ALIAS_REGEX.test(value.trim());
+}
+
+// Match normalization
 export function normalizeMatches(raw: unknown): MatchItem[] | undefined {
     if (!Array.isArray(raw)) return undefined;
 
@@ -12,7 +17,7 @@ export function normalizeMatches(raw: unknown): MatchItem[] | undefined {
         const record = item as Record<string, unknown>;
         const source =
             typeof record.source === "string" ? record.source.trim() : "";
-        if (!source) return;
+        if (!source || !isPublicSourceLabel(source)) return;
 
         const score =
             typeof record.score === "number" && Number.isFinite(record.score)
@@ -24,8 +29,8 @@ export function normalizeMatches(raw: unknown): MatchItem[] | undefined {
                 : `m-${index + 1}`;
         const metadata =
             record.metadata &&
-                typeof record.metadata === "object" &&
-                !Array.isArray(record.metadata)
+            typeof record.metadata === "object" &&
+            !Array.isArray(record.metadata)
                 ? (record.metadata as Record<string, unknown>)
                 : undefined;
 
@@ -35,21 +40,20 @@ export function normalizeMatches(raw: unknown): MatchItem[] | undefined {
     return matches.length > 0 ? matches : undefined;
 }
 
-// ── Source normalization ─────────────────────────────────────────────
-
+// Source normalization
 export function normalizeSources(raw: unknown): string[] | undefined {
     if (!Array.isArray(raw)) return undefined;
     const out = new Set<string>();
     for (const item of raw) {
         if (typeof item !== "string") continue;
         const trimmed = item.trim();
-        if (trimmed) out.add(trimmed);
+        if (!trimmed || !isPublicSourceLabel(trimmed)) continue;
+        out.add(trimmed);
     }
     return out.size > 0 ? [...out] : undefined;
 }
 
-// ── Citations normalization ──────────────────────────────────────────
-
+// Citations normalization
 export function normalizeCitations(raw: unknown): string[] | undefined {
     if (!Array.isArray(raw)) return undefined;
     const out: string[] = [];
@@ -58,7 +62,7 @@ export function normalizeCitations(raw: unknown): string[] | undefined {
     for (const item of raw) {
         if (typeof item !== "string") continue;
         const trimmed = item.trim();
-        if (!trimmed) continue;
+        if (!trimmed || !isPublicSourceLabel(trimmed)) continue;
         const key = trimmed
             .normalize("NFKC")
             .replace(/[\u2010-\u2015]/g, "-")
@@ -73,8 +77,7 @@ export function normalizeCitations(raw: unknown): string[] | undefined {
     return out.length > 0 ? out : undefined;
 }
 
-// ── Thinking steps normalization ─────────────────────────────────────
-
+// Thinking steps normalization
 export function normalizeThinkingSteps(raw: unknown): ThinkingStep[] | undefined {
     if (!Array.isArray(raw)) return undefined;
     const out: ThinkingStep[] = [];
@@ -100,7 +103,7 @@ export function normalizeThinkingSteps(raw: unknown): ThinkingStep[] | undefined
             stateRaw === "pending" || stateRaw === "done" ? stateRaw : "active";
         const updatedAt =
             typeof record.updated_at_ms === "number" &&
-                Number.isFinite(record.updated_at_ms)
+            Number.isFinite(record.updated_at_ms)
                 ? record.updated_at_ms
                 : undefined;
         out.push({
@@ -115,8 +118,7 @@ export function normalizeThinkingSteps(raw: unknown): ThinkingStep[] | undefined
     return out.length > 0 ? out : undefined;
 }
 
-// ── Response mode normalization ──────────────────────────────────────
-
+// Response mode normalization
 export function normalizeResponseMode(
     raw: unknown
 ): "auto" | "light" | "heavy" | undefined {
@@ -128,8 +130,7 @@ export function normalizeResponseMode(
     return undefined;
 }
 
-// ── Quota normalization ──────────────────────────────────────────────
-
+// Quota normalization
 export interface NormalizedQuota {
     limit: number;
     used: number;

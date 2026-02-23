@@ -44,6 +44,10 @@ function normalizeSourceToken(raw: string): string {
     return trimmed;
 }
 
+function escapeRegExp(value: string): string {
+    return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 function sanitizeAnswerCitations(
     answer: string,
     aliasMap: Map<string, string>
@@ -54,6 +58,45 @@ function sanitizeAnswerCitations(
         if (!alias) return full;
         return `[${alias}]`;
     });
+}
+
+function sourceVariants(raw: string): string[] {
+    const trimmed = raw.trim();
+    if (!trimmed) return [];
+    if (["unknown", "none", "n/a", "na"].includes(trimmed.toLowerCase())) {
+        return [];
+    }
+    const out = new Set<string>();
+    out.add(trimmed);
+
+    const leaf = trimmed.split(/[\\/]+/).at(-1)?.trim();
+    if (leaf) {
+        out.add(leaf);
+        const queryless = leaf.split("?")[0].split("#")[0].trim();
+        if (queryless) out.add(queryless);
+    }
+    return [...out].filter((value) => value.length >= 3);
+}
+
+function redactSourceIdentifiers(
+    answer: string,
+    aliasMap: Map<string, string>
+): string {
+    if (!answer || aliasMap.size === 0) return answer;
+    const redactions: Array<[string, string]> = [];
+
+    for (const [rawSource, alias] of aliasMap.entries()) {
+        for (const variant of sourceVariants(rawSource)) {
+            redactions.push([variant, alias]);
+        }
+    }
+
+    redactions.sort((a, b) => b[0].length - a[0].length);
+    let redacted = answer;
+    for (const [variant, alias] of redactions) {
+        redacted = redacted.replace(new RegExp(escapeRegExp(variant), "gi"), alias);
+    }
+    return redacted;
 }
 
 function sanitizeEvidence(payload: Record<string, unknown>) {
@@ -96,7 +139,10 @@ function sanitizeEvidence(payload: Record<string, unknown>) {
         })
         .filter(Boolean) as MatchItem[];
 
-    const answer = sanitizeAnswerCitations(rawAnswer, aliasMap);
+    const answer = sanitizeAnswerCitations(
+        redactSourceIdentifiers(rawAnswer, aliasMap),
+        aliasMap
+    );
     return { answer, sources, matches };
 }
 
